@@ -21,7 +21,6 @@ class TicTacToeButton(nextcord.ui.View):
             self.add_item(TTTButton(row=self.row_value, custom_id=str(i)))  # 버튼 추가
 
     async def on_timeout(self):
-        print(self.message)
         for child in self.children:
             child.disabled = True
         await self.message.edit(content="15초간 응답이 없어 종료 되었습니다", view=self)
