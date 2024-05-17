@@ -10,3 +10,5 @@ orjson==3.10.0
 python-dotenv==1.0.1
 typing_extensions==4.11.0
 yarl==1.9.4
+
+Flask~=3.0.3

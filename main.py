@@ -3,6 +3,7 @@ from nextcord.ext import commands
 from nextcord import Interaction
 import os
 from dotenv import load_dotenv
+from web import open_web
 
 load_dotenv()
 
@@ -29,5 +30,6 @@ async def reload(interaction: Interaction):
             bot.reload_extension(f"cogs.{filename[:-3]}")
     await interaction.response.send_message("reloaded")
 
+open_web()
 
 bot.run(bot_token)
