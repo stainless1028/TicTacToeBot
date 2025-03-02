@@ -28,8 +28,8 @@ async def reload(interaction: Interaction):
     for filename in os.listdir("./cogs"):
         if filename.endswith(".py"):
             bot.reload_extension(f"cogs.{filename[:-3]}")
-    await interaction.response.send_message("reloaded")
+    await interaction.response.send_message("reloaded all commands")
 
-open_web()
+open_web()  # this function is for hosting on Koyeb
 
 bot.run(bot_token)
