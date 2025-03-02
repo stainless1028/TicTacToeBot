@@ -1,3 +1,5 @@
+# This file is useless when hosting local
+
 from flask import Flask
 from threading import Thread
 
