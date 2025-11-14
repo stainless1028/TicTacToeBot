@@ -8,16 +8,17 @@ from web import open_web
 load_dotenv()
 
 bot_token = os.environ.get("BOT_TOKEN")
-admin = os.environ.get("ADMIN")
+# admin = os.environ.get("ADMIN")
 
 intents = nextcord.Intents.all()
-bot = commands.Bot(intents=intents, owner_id=int(admin))
+# bot = commands.Bot(intents=intents, owner_id=int(admin))
+bot = commands.Bot(intents=intents)
 
 
 @bot.event
 async def on_ready():
     print(f'We have logged in as {bot.user}')
-    print(f"admin: {admin}")
+    # print(f"admin: {admin}")
 
 
 for filename in os.listdir("./cogs"):
@@ -25,13 +26,13 @@ for filename in os.listdir("./cogs"):
         bot.load_extension(f"cogs.{filename[:-3]}")
 
 
-@bot.slash_command(name="reload", description="Reload all cogs")
-@commands.is_owner()
-async def reload(interaction: Interaction):
-    for filename in os.listdir("./cogs"):
-        if filename.endswith(".py"):
-            bot.reload_extension(f"cogs.{filename[:-3]}")
-    await interaction.response.send_message("reloaded all commands")
+# @bot.slash_command(name="reload", description="Reload all cogs")
+# @commands.is_owner()
+# async def reload(interaction: Interaction):
+#     for filename in os.listdir("./cogs"):
+#         if filename.endswith(".py"):
+#             bot.reload_extension(f"cogs.{filename[:-3]}")
+#     await interaction.response.send_message("reloaded all commands")
 
 open_web()  # 다른 사이트 호스팅 용도, 로컬로 호스팅 시 필요없음
 
