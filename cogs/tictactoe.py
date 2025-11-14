@@ -2,154 +2,172 @@ from nextcord.ext import commands
 import nextcord
 from nextcord import Interaction, SlashOption, ButtonStyle
 from random import randint
-from textwrap import dedent
 
-o_emoji = nextcord.PartialEmoji.from_str("o:1226379343173910560")
-x_emoji = nextcord.PartialEmoji.from_str("x:1226379383250354196")
-blank_emoji = nextcord.PartialEmoji.from_str("background:1226409343591780403")
+active_servers: dict[int, "TicTacToeGame"] = {}
 
+O_EMOJI = nextcord.PartialEmoji.from_str("o:1226379343173910560")
+X_EMOJI = nextcord.PartialEmoji.from_str("x:1226379383250354196")
+BLANK_EMOJI = nextcord.PartialEmoji.from_str("background:1226409343591780403")
+WINNING_CONDITIONS = [
+    {0, 1, 2}, {3, 4, 5}, {6, 7, 8},  # 가로
+    {0, 3, 6}, {1, 4, 7}, {2, 5, 8},  # 세로
+    {0, 4, 8}, {2, 4, 6},             # 대각선
+]
 
-class TicTacToeButton(nextcord.ui.View):
-    def __init__(self, player1, player2):
-        super().__init__(timeout=15)
+class TicTacToeGame:
+    """단일 게임 관리 클래스"""
+
+    def __init__(self, interaction: Interaction, player1: nextcord.Member, player2: nextcord.Member):
+        self.interaction = interaction
         self.message = None
-        self.player1 = player1
-        self.player2 = player2
-        self.players = [player1, player2]
-        self.count = 0
         self.game_over = False
+        self.move_count = 0
 
-        if self.players[randint(0, 1)] == player1:
-            self.p1 = {"player": player1, "emoji": o_emoji, "color": ButtonStyle.blurple, "pos": []}
-            self.p2 = {"player": player2, "emoji": x_emoji, "color": ButtonStyle.red, "pos": []}
-            self.turn = self.p1
+        turn_init = randint(0, 1)
+        if turn_init == 0:
+            self.p1_info = {"player": player1, "emoji": O_EMOJI, "color": ButtonStyle.blurple, "pos": set()}
+            self.p2_info = {"player": player2, "emoji": X_EMOJI, "color": ButtonStyle.red, "pos": set()}
         else:
-            self.p1 = {"player": player1, "emoji": x_emoji, "color": ButtonStyle.red, "pos": []}
-            self.p2 = {"player": player2, "emoji": o_emoji, "color": ButtonStyle.blurple, "pos": []}
-            self.turn = self.p2
+            self.p1_info = {"player": player1, "emoji": X_EMOJI, "color": ButtonStyle.red, "pos": set()}
+            self.p2_info = {"player": player2, "emoji": O_EMOJI, "color": ButtonStyle.blurple, "pos": set()}
 
-        self.row_value = 0
+        self.turn = self.p1_info if turn_init == 0 else self.p2_info
+        self.view = TicTacToeView(self)
+
+    def switch_turn(self):
+        self.turn = self.p2_info if self.turn == self.p1_info else self.p1_info
+
+    def get_message(self, message: str) -> str:
+        header = f"**{self.p1_info["player"].name}** **vs.** **{self.p2_info["player"].name}**"
+        return f"{header}\n\n{message}"
+
+    async def start(self):
+        active_servers[self.interaction.guild_id] = self
+
+        initial_message = self.get_message(f"<@{self.turn["player"].id}>님 차례입니다\n15초 안에 버튼을 눌러주세요!")
+        self.message = await self.interaction.send(initial_message, view=self.view)
+
+        await self.view.wait()
+        self.cleanup()
+
+    async def check_win(self):
+        winner = None
+        p1_pos = self.p1_info["pos"]
+        p2_pos = self.p2_info["pos"]
+
+        for condition in WINNING_CONDITIONS:
+            if condition.issubset(p1_pos):
+                winner = self.p1_info["player"]
+                break
+            if condition.issubset(p2_pos):
+                winner = self.p2_info["player"]
+                break
+
+        if winner is not None:
+            await self.end_game(f"{winner.mention}님이 이겼습니다!")
+        elif self.move_count == 9:
+            await self.end_game("무승부 입니다")
+
+    async def end_game(self, message: str):
+        """게임 종료(버튼 비활성화와 메시지 수정)"""
+        if self.game_over:
+            return
+        self.game_over = True
+
+        final_message = self.get_message(message)
+        for button in self.view.children:
+            button.disabled = True
+
+        try:
+            await self.message.edit(content=final_message, view=self.view)
+        except nextcord.NotFound:  # 메시지가 삭제된 경우
+            pass
+        self.view.stop()
+
+    def cleanup(self):
+        if self.interaction.guild_id in active_servers:
+            del active_servers[self.interaction.guild_id]
+
+
+class TicTacToeView(nextcord.ui.View):
+    """버튼 전체 관리"""
+
+    def __init__(self, game: TicTacToeGame):
+        super().__init__(timeout=15)
+        self.game = game
+        prefix = self.game.interaction.id
+
+        # 3x3 버튼 추가
         for i in range(9):
-            if i % 3 == 0:
-                self.row_value += 1
-            self.add_item(TTTButton(row=self.row_value, custom_id=str(i)))  # 버튼 추가(adding buttons)
+            btn_id = f"{prefix}:{i}"
+            self.add_item(TTTButton(row=(i // 3), custom_id=btn_id))
 
     async def on_timeout(self):
-        for child in self.children:
-            child.disabled = True
-        await self.message.edit(content="15초간 응답이 없어 종료 되었습니다", view=self)
-        self.stop()
-        return
-
-    async def win_check(self):
-        winner = None
-        pos1 = self.p1["pos"]
-        pos2 = self.p2["pos"]
-        winning_conditions = [
-            [0, 1, 2],
-            [3, 4, 5],
-            [6, 7, 8],
-            [0, 3, 6],
-            [1, 4, 7],
-            [2, 5, 8],
-            [0, 4, 8],
-            [2, 4, 6],
-        ]
-        for winning_pos in winning_conditions:
-            if all(pos in pos1 for pos in winning_pos):
-                winner = self.p1["player"]
-                break
-            elif all(pos in pos2 for pos in winning_pos):
-                winner = self.p2["player"]
-                break
-        if winner is not None:
-            for child in self.children:
-                child.disabled = True
-            message = dedent(f"""
-            **{self.player1.name}** **vs.** **{self.player2.name}**
-            {winner.mention}님이 이겼습니다!
-            """)
-            await self.message.edit(content=message, view=self)
-            self.game_over = True
-            self.stop()
-            return
-
-        if self.count == 9:
-            message = dedent(f"""
-            **{self.player1.name}** **vs.** **{self.player2.name}**
-
-            무승부입니다
-            """)
-            await self.message.edit(content=message, view=self)
-            self.game_over = True
-            self.stop()
-            return
+        if not self.game.game_over:
+            await self.game.end_game("15초간 응답이 없어 종료 되었습니다")
 
 
 class TTTButton(nextcord.ui.Button):
+    """개별 버튼"""
+
     def __init__(self, row: int, custom_id: str):
-        super().__init__(label=None, style=ButtonStyle.gray, emoji=blank_emoji, row=row, custom_id=custom_id)
-
-    async def switch_turn(self):
-        parent_view: TicTacToeButton = self.view
-        if parent_view.turn["player"] == parent_view.player1:
-            parent_view.turn = parent_view.p2
-        else:
-            parent_view.turn = parent_view.p1
-        return dedent(f"""
-        **{parent_view.player1.name}** **vs.** **{parent_view.player2.name}**
-
-        <@{parent_view.turn["player"].id}>님 차례입니다
-        15초 안에 버튼을 눌러주세요!
-        """)
+        # blank emoji를 넣어주지 않으면 모바일에서 버튼 크기가 이상해 보임
+        super().__init__(label=None, style=ButtonStyle.gray, emoji=BLANK_EMOJI, row=row, custom_id=custom_id)
 
     async def callback(self, interaction: Interaction):
-        parent_view: TicTacToeButton = self.view
-        if interaction.user == parent_view.turn["player"]:
-            parent_view.count += 1
-            self.disabled = True
-            self.emoji = parent_view.turn["emoji"]
-            self.style = parent_view.turn["color"]
-            parent_view.turn["pos"].append(int(interaction.data["custom_id"]))
-            parent_view.turn["pos"].sort()
-            await parent_view.win_check()
-            if not parent_view.game_over:
-                message = await self.switch_turn()
-                await interaction.response.edit_message(content=message, view=parent_view)
-        elif interaction.user in parent_view.players and interaction.user != parent_view.turn["player"]:
-            await interaction.response.send_message("상대의 차례입니다", ephemeral=True)
-        else:
+        # 버튼 클릭 시 호출
+        game: TicTacToeGame = self.view.game
+
+        if interaction.user not in {game.p1_info["player"], game.p2_info["player"]}:
             await interaction.response.send_message("참가자가 아닙니다", ephemeral=True)
+            return
+
+        if interaction.user != game.turn["player"]:
+            await interaction.response.send_message("상대의 차례입니다", ephemeral=True)
+            return
+
+        current_player = game.turn
+        self.disabled = True
+        self.emoji = current_player["emoji"]
+        self.style = current_player["color"]
+        game.move_count += 1
+        current_player["pos"].add(int(self.custom_id[-1]))
+
+        await game.check_win()
+
+        if not game.game_over:
+            game.switch_turn()
+            message = game.get_message(f"<@{game.turn["player"].id}>님 차례입니다\n15초 안에 버튼을 눌러주세요!")
+            await interaction.response.edit_message(content=message, view=self.view)
 
 
 class Tictactoe(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # noinspection NonAsciiCharacters,PyPep8Naming
     @nextcord.slash_command(name="틱택토", description="원하는 사람과 틱택토를 해보세요")
-    async def 틱택토(self, interaction: Interaction, 상대: nextcord.Member = SlashOption(description="상대를 선택해 주세요", required=True)):
-        player1 = interaction.user
-        player2 = 상대
+    async def tictactoe_command(
+            self,
+            interaction: Interaction,
+            opponent: nextcord.Member = SlashOption(
+                name="상대",
+                description="상대를 선택해 주세요",
+                required=True
+            )
+    ):
+        if interaction.guild_id in active_servers:
+            await interaction.send("서버에 이미 진행중인 게임이 있어요.", delete_after=5)
+            return
 
-        if player1.id == player2.id:
+        if interaction.user.id == opponent.id:
             await interaction.send("혼자서는 플레이 할 수 없어요", ephemeral=True)
             return
-        if player1.bot or player2.bot:
+        if opponent.bot:
             await interaction.send("봇과는 플레이 할 수 없어요", ephemeral=True)
             return
 
-        view = TicTacToeButton(player1, player2)
-
-        message = dedent(f"""
-        **{player1.name}** **vs.** **{player2.name}**
-
-        <@{view.turn["player"].id}>님 차례입니다
-        15초 안에 버튼을 눌러주세요!
-        """)
-
-        view.message = await interaction.send(message, view=view)
-        await view.wait()
+        game = TicTacToeGame(interaction, interaction.user, opponent)
+        await game.start()
 
 
 def setup(bot):
