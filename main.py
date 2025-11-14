@@ -8,9 +8,10 @@ from web import open_web
 load_dotenv()
 
 bot_token = os.getenv("BOT_TOKEN")
+admin = os.getenv("ADMIN")
 
 intents = nextcord.Intents.all()
-bot = commands.Bot(intents=intents)
+bot = commands.Bot(intents=intents, owner_id=admin)
 
 
 @bot.event
@@ -24,6 +25,7 @@ for filename in os.listdir("./cogs"):
 
 
 @bot.slash_command(name="reload", description="Reload all cogs")
+@commands.is_owner()
 async def reload(interaction: Interaction):
     for filename in os.listdir("./cogs"):
         if filename.endswith(".py"):
