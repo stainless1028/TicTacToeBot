@@ -11,7 +11,7 @@ bot_token = os.getenv("BOT_TOKEN")
 admin = os.getenv("ADMIN")
 
 intents = nextcord.Intents.all()
-bot = commands.Bot(intents=intents, owner_id=admin)
+bot = commands.Bot(intents=intents, owner_id=int(admin))
 
 
 @bot.event
