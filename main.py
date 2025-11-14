@@ -17,6 +17,7 @@ bot = commands.Bot(intents=intents, owner_id=int(admin))
 @bot.event
 async def on_ready():
     print(f'We have logged in as {bot.user}')
+    print(f"admin: {admin}")
 
 
 for filename in os.listdir("./cogs"):
