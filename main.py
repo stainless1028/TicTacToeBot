@@ -7,8 +7,8 @@ from web import open_web
 
 load_dotenv()
 
-bot_token = os.getenv("BOT_TOKEN")
-admin = os.getenv("ADMIN")
+bot_token = os.environ.get("BOT_TOKEN")
+admin = os.environ.get("ADMIN")
 
 intents = nextcord.Intents.all()
 bot = commands.Bot(intents=intents, owner_id=int(admin))
