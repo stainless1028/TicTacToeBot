@@ -30,6 +30,6 @@ async def reload(interaction: Interaction):
             bot.reload_extension(f"cogs.{filename[:-3]}")
     await interaction.response.send_message("reloaded all commands")
 
-open_web()  # this function is for hosting on Koyeb
+open_web()  # 다른 사이트 호스팅 용도, 로컬로 호스팅 시 필요없음
 
 bot.run(bot_token)
