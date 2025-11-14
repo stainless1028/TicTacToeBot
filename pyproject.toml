@@ -1,0 +1,11 @@
+[project]
+name = "tictactoebot"
+version = "0.1.0"
+description = "Simple Discord TicTacToe bot"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "nextcord[speed]",
+    "Flask",
+    "python-dotenv",
+]
