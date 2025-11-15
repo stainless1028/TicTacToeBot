@@ -8,11 +8,18 @@ active_servers: dict[int, "TicTacToeGame"] = {}
 O_EMOJI = nextcord.PartialEmoji.from_str("o:1226379343173910560")
 X_EMOJI = nextcord.PartialEmoji.from_str("x:1226379383250354196")
 BLANK_EMOJI = nextcord.PartialEmoji.from_str("background:1226409343591780403")
-WINNING_CONDITIONS = [
-    {0, 1, 2}, {3, 4, 5}, {6, 7, 8},  # 가로
-    {0, 3, 6}, {1, 4, 7}, {2, 5, 8},  # 세로
-    {0, 4, 8}, {2, 4, 6},             # 대각선
-]
+WINNING_CONDITIONS = {
+    # 마지막 수에 대한 승리조건들
+    0: [{0, 1, 2}, {0, 3, 6}, {0, 4, 8}],
+    1: [{0, 1, 2}, {1, 4, 7}],
+    2: [{0, 1, 2}, {2, 5, 8}, {2, 4, 6}],
+    3: [{3, 4, 5}, {0, 3, 6}],
+    4: [{3, 4, 5}, {1, 4, 7}, {0, 4, 8}, {2, 4, 6}],
+    5: [{3, 4, 5}, {2, 5, 8}],
+    6: [{6, 7, 8}, {0, 3, 6}, {2, 4, 6}],
+    7: [{6, 7, 8}, {1, 4, 7}],
+    8: [{6, 7, 8}, {2, 5, 8}, {0, 4, 8}],
+}
 
 class TicTacToeGame:
     """단일 게임 관리 클래스"""
@@ -50,22 +57,18 @@ class TicTacToeGame:
         await self.view.wait()
         self.cleanup()
 
-    async def check_win(self):
-        winner = None
-        p1_pos = self.p1_info["pos"]
-        p2_pos = self.p2_info["pos"]
+    async def check_win(self, last_pos: int):
+        if self.move_count < 5:
+            return
+        
+        turn_pos = self.turn["pos"]
+        for condition in WINNING_CONDITIONS[last_pos]:
+            if condition.issubset(turn_pos):
+                winner = self.turn["player"]
+                await self.end_game(f"{winner.mention}님이 이겼습니다!")
+                return
 
-        for condition in WINNING_CONDITIONS:
-            if condition.issubset(p1_pos):
-                winner = self.p1_info["player"]
-                break
-            if condition.issubset(p2_pos):
-                winner = self.p2_info["player"]
-                break
-
-        if winner is not None:
-            await self.end_game(f"{winner.mention}님이 이겼습니다!")
-        elif self.move_count == 9:
+        if self.move_count == 9:
             await self.end_game("무승부 입니다")
 
     async def end_game(self, message: str):
@@ -131,9 +134,9 @@ class TTTButton(nextcord.ui.Button):
         self.emoji = current_player["emoji"]
         self.style = current_player["color"]
         game.move_count += 1
-        current_player["pos"].add(int(self.custom_id[-1]))
-
-        await game.check_win()
+        last_position = int(self.custom_id[-1])
+        current_player["pos"].add(last_position)
+        await game.check_win(last_position)
 
         if not game.game_over:
             game.switch_turn()
